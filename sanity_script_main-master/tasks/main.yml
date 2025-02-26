@@ -1,0 +1,50 @@
+---
+- name: Copy shell script to remote server
+  copy:
+    src: sanitychk.sh
+    dest: /tmp/
+    mode: '0755'
+    
+- name: Run the sanity script
+  shell: /tmp/sanitychk.sh
+  register: script_output
+  ignore_errors: yes
+  no_log: true
+
+  
+- name: Create directory for today's date
+  file:
+    path: "/app/platform/sanity_bsd/{{ ansible_date_time.date }}"
+    state: directory
+    mode: 0755
+  delegate_to: localhost
+  become_user: coreadm
+
+- name: Save script output to a file with timestamp in today's directory
+  copy:
+    content: "{{ script_output.stdout }}"
+    dest: "/app/platform/sanity_bsd/{{ ansible_date_time.date }}/{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}{{ ansible_date_time.minute }}_{{ inventory_hostname }}.txt"
+    mode: 0755  
+  delegate_to: localhost
+  become_user: coreadm
+  #become: yes
+
+#- name: Delete directories
+  #command: find /app/platform/sanity_bsd/ -type d -mtime +60 -delete
+  #register: del_directories
+  #changed_when: del_directories.stdout_lines | length > 0
+  #delegate_to: localhost
+  
+- name: new Delete directories
+  command: find /app/platform/sanity_bsd/ -type d -mtime +60 -exec rm -r {} \;
+  register: del_directories
+  changed_when: del_directories.stdout_lines | length > 0
+  delegate_to: localhost
+  ignore_errors: yes
+  
+- name: Print the deleted directories
+  debug:
+    msg: "Directories deleted: {{ del_directories.stdout_lines | join(', ') }}"
+  when: del_directories.changed
+  delegate_to: localhost
+  ignore_errors: yes
